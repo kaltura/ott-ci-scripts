@@ -7,6 +7,7 @@ const copydir = require('copy-dir');
 
 
 const sourcePath = process.argv[2];
+const branch = process.argv[3];
 
 function getPaths(file) {
 	return new Promise((resolve, reject) => {
@@ -23,7 +24,7 @@ function getPaths(file) {
 			}
 
 			let gitName = 'KalturaOttGeneratedAPIClients' + file.substr(0, 1).toUpperCase() + file.substr(1);
-			let gitPath = path.join(__dirname, gitName);
+			let gitPath = path.join(__dirname, branch, gitName);
 			
 			fs.exists(gitPath, (exists) => {
 				if(exists) {
@@ -59,9 +60,17 @@ function execWithPomise(command, cwd, resolveData) {
 	});
 }
 
+function gitCheckout(generatedPath, gitPath) {
+	console.log(`Checking out git ${gitPath} branch ${branch}`);
+	return execWithPomise('git checkout ' + branch, gitPath, {
+		generatedPath: generatedPath, 
+		gitPath: gitPath
+	});
+}
+
 function gitPull(generatedPath, gitPath) {
-	console.log(`Pulling files to git ${gitPath}`);
-	return execWithPomise('git pull origin master', gitPath, {
+	console.log(`Pulling files to git ${gitPath} branch ${branch}`);
+	return execWithPomise('git pull origin ' + branch, gitPath, {
 		generatedPath: generatedPath, 
 		gitPath: gitPath
 	});
@@ -93,8 +102,8 @@ function gitCommit(gitPath) {
 }
 
 function gitPush(gitPath) {
-	console.log(`Pushing files to git ${gitPath}`);
-	return execWithPomise('git push origin master', gitPath);
+	console.log(`Pushing files to git ${gitPath} branch ${branch}`);
+	return execWithPomise('git push origin ' + branch, gitPath);
 }
 
 let handledFiles = 0;
@@ -119,6 +128,9 @@ fs.readdir(sourcePath, (err, files) => {
 	files.forEach((file, index) => {
 		startHandlingFile();
 		getPaths(file)
+		.then(({generatedPath, gitPath}) => {
+			return gitCheckout(generatedPath, gitPath);
+		})
 		.then(({generatedPath, gitPath}) => {
 			return gitPull(generatedPath, gitPath);
 		})
