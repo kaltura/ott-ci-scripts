@@ -8,6 +8,12 @@ const copydir = require('copy-dir');
 
 const sourcePath = process.argv[2];
 const branch = process.argv[3];
+const token = process.argv[4];
+
+let branchPath = path.join(__dirname, branch);
+if(!fs.existsSync(branchPath)) {
+	fs.mkdirSync(branchPath);
+}
 
 function getPaths(file) {
 	return new Promise((resolve, reject) => {
@@ -23,8 +29,8 @@ function getPaths(file) {
 				return;
 			}
 
-			let gitName = 'KalturaOttGeneratedAPIClients' + file.substr(0, 1).toUpperCase() + file.substr(1);
-			let gitPath = path.join(__dirname, branch, gitName);
+			let repo = 'KalturaOttGeneratedAPIClients' + file.substr(0, 1).toUpperCase() + file.substr(1);
+			let gitPath = path.join(__dirname, branch, repo);
 			
 			fs.exists(gitPath, (exists) => {
 				if(exists) {
@@ -34,7 +40,17 @@ function getPaths(file) {
 					});
 				}
 				else {
-					reject(`Git path ${gitPath} not found`);
+					gitClone(repo)
+					.then(() => gitCheckout(generatedPath, gitPath, true))
+					.then(() => gitPush(gitPath))
+					.then(() => {
+						resolve({
+							generatedPath: generatedPath, 
+							gitPath: gitPath
+						});
+					}, (err) => {
+						reject(`Failed to clone repo ${repo}: ${err}`);
+					});
 				}
 			})
 		});
@@ -60,9 +76,14 @@ function execWithPomise(command, cwd, resolveData) {
 	});
 }
 
-function gitCheckout(generatedPath, gitPath) {
+function gitClone(repo) {
+	console.log(`Cloning git repo ${repo}, branch ${branch}`);
+	return execWithPomise(`git clone https://${token}@github.com/kaltura/${repo}`, branchPath);
+}
+
+function gitCheckout(generatedPath, gitPath, isNew) {
 	console.log(`Checking out git ${gitPath} branch ${branch}`);
-	return execWithPomise('git checkout ' + branch, gitPath, {
+	return execWithPomise('git checkout ' + (isNew ? '-b ' : '') + branch, gitPath, {
 		generatedPath: generatedPath, 
 		gitPath: gitPath
 	});
